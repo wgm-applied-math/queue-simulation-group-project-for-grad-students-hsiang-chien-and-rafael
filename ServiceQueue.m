@@ -7,12 +7,13 @@ classdef ServiceQueue < handle
         % ArrivalRate - Customers arrive according to a Poisson process.
         % The inter-arrival time is exponentially distributed with a rate
         % parameter of ArrivalRate.
-        ArrivalRate = 0.5;
+        ArrivalRate = 1/120;
 
         % DepartureRate - When a customer arrives, the time it takes for
         % them to be served is exponentially distributed with a rate
         % parameter of DepartureRate.
-        DepartureRate = 1/1.5;
+        DepartureRate = 1/180;
+        RenegingRate = 1/15;
 
         % NumServers - How many identical serving stations are available.
         NumServers = 1;
@@ -67,6 +68,9 @@ classdef ServiceQueue < handle
         % empty.  When a Customer's service is complete, the Customer
         % object is moved from its slot in Servers to the end of Served.
         Served;
+        
+        % Renege
+        Renege
 
         % Log - Table of log entries. Its columns are 'Time', 'NWaiting',
         % 'NInService', 'NServed', meaning: time, how many customers are
@@ -108,17 +112,19 @@ classdef ServiceQueue < handle
                 makedist("Exponential", mu=1/obj.ArrivalRate);
             obj.ServiceDist = ...
                 makedist("Exponential", mu=1/obj.DepartureRate);
+            obj.Renege = ...
+                makedist("Exponential", mu=1/obj.RenegingRate);
             obj.ServerAvailable = repelem(true, obj.NumServers);
             obj.Servers = cell([1, obj.NumServers]);
             obj.Events = PriorityQueue({}, @(x) x.Time);
             obj.Waiting = {};
             obj.Served = {};
             obj.Log = table( ...
-                Size=[0, 4], ...
+                Size=[0, 5], ...
                 VariableNames=...
-                    {'Time', 'NWaiting', 'NInService', 'NServed'}, ...
+                    {'Time', 'NWaiting', 'NInService', 'NServed','NRenege'}, ...
                 VariableTypes=...
-                    {'double', 'int64', 'int64', 'int64'});
+                    {'double', 'int64', 'int64', 'int64','int64'});
 
             % The first event is to record the state at time 0 to the log.
             schedule_event(obj, RecordToLog(0));
@@ -202,7 +208,8 @@ classdef ServiceQueue < handle
             % Check to see if any customers can advance.
             advance(obj);
         end
-
+        
+        function handle_
         function handle_departure(obj, departure)
             % handle_departure Handle a departure event.
 
@@ -224,7 +231,7 @@ classdef ServiceQueue < handle
             % Check to see if any customers can advance.
             advance(obj);
         end
-
+ 
         function begin_serving(obj, j, customer)
             % begin_serving Begin serving the given customer at station j.
             % This is a helper method for advance(). It's a separate method
@@ -299,9 +306,10 @@ classdef ServiceQueue < handle
             NWaiting = length(obj.Waiting);
             NInService = obj.NumServers - sum(obj.ServerAvailable);
             NServed = length(obj.Served);
+            NRenege = length(obj.Renege);
 
             % MATLAB-ism: This is how to add a row to the end of a table.
-            obj.Log(end+1, :) = {obj.Time, NWaiting, NInService, NServed};
+            obj.Log(end+1, :) = {obj.Time, NWaiting, NInService, NServed,NRenege};
         end
     end
 end

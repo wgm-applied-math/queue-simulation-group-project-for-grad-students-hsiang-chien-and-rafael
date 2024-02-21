@@ -6,8 +6,8 @@
 % Set up to run 100 samples of the queue.
 n_samples = 100;
 
-% Each sample is run up to a maximum time of 1000.
-max_time = 1000;
+% Each sample is run up to a maximum time of 480 (8 hours).
+max_time = 480;
 
 % Record how many customers are in the system at the end of each sample.
 NInSystemSamples = cell([1, n_samples]);
