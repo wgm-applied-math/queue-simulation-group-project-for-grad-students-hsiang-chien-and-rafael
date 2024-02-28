@@ -24,6 +24,9 @@ classdef Customer < handle
         % station.  This time is assigned in ServiceQueue's
         % handle_departure method.
         DepartureTime;
+        
+        % RenegeTime
+        RenegeTime;
     end
 
     methods
@@ -37,6 +40,7 @@ classdef Customer < handle
                 ArrivalTime = Inf;
                 BeginServiceTime = Inf;
                 DepartureTime = Inf;
+                RenegeTime = Inf;
             end
             obj.Id = Id;
             obj.ArrivalTime = ArrivalTime;
