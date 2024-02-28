@@ -40,7 +40,7 @@ classdef Customer < handle
                 ArrivalTime = Inf;
                 BeginServiceTime = Inf;
                 DepartureTime = Inf;
-                RenegeTime = Inf;
+            
             end
             obj.Id = Id;
             obj.ArrivalTime = ArrivalTime;
