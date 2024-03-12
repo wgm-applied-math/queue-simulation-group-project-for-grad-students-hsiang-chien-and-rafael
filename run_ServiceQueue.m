@@ -19,7 +19,7 @@ NInSystemSamples = cell([1, n_samples]);
 % the log interval should be long enough for several arrival and departure
 % events happen.
 for sample_num = 1:n_samples
-    q = ServiceQueue(LogInterval=10);
+    q = ServiceQueue(LogInterval=10,NumServers=1);
     q.schedule_event(Arrival(1, Customer(1)));
     run_until(q, max_time);
     % Pull out samples of the number of customers in the queue system. Each
@@ -27,13 +27,14 @@ for sample_num = 1:n_samples
     % counts, because tables like q.Log allow easy extraction of whole
     % columns like this.
     NInSystemSamples{sample_num} = q.Log.NWaiting + q.Log.NInService;
+    TotalTimeSamples{sample_num} = served_customer_times(q);
 end
 
 % Join all the samples. "vertcat" is short for "vertical concatenate",
 % meaning it joins a bunch of arrays vertically, which in this case results
 % in one tall column.
 NInSystem = vertcat(NInSystemSamples{:});
-
+TotalTime = vertcat(TotalTimeSamples{:});
 % MATLAB-ism: When you pull multiple items from a cell array, the result is
 % a "comma-separated list" rather than some kind of array.  Thus, the above
 % means
@@ -51,7 +52,8 @@ NInSystem = vertcat(NInSystemSamples{:});
 % Start with a histogram.  The result is an empirical PDF, that is, the
 % area of the bar at horizontal index n is proportional to the fraction of
 % samples for which there were n customers in the system.
-h = histogram(NInSystem, Normalization="probability", BinMethod="integers");
+%h2 = histogram(TotalTime, Normalization="probability", BinMethod="integers");
+h1 = histogram(NInSystem, Normalization="probability", BinMethod="integers");
 
 % MATLAB-ism: Once you've created a picture, you can use "hold on" to cause
 % further plotting function to work with the same picture rather than
@@ -62,15 +64,27 @@ hold on;
 % The agreement isn't all that good unless you run for a long time, say
 % max_time = 10,000 units, and LogInterval is large, say 10.
 rho = q.ArrivalRate / q.DepartureRate;
-P0 = 1 - rho;
+P0 = 0.527169;
 nMax = 10;
 ns = 0:nMax;
 P = zeros([1, nMax+1]);
 P(1) = P0;
 for n = 1:nMax
-    P(1+n) = P0 * rho^n;
+    P(1+n) = P(n) * q.ArrivalRate / (q.DepartureRate + (n-1)*q.RenegingRate);
 end
 plot(ns, P, 'o', MarkerEdgeColor='k', MarkerFaceColor='r');
+
+% Steady-State Statistic
+L = sum(ns .* P);
+Lqlist = zeros([1, nMax+1]);
+for n = (q.NumServers):nMax
+    Lqlist(n+1) = (n+1-q.NumServers) * P(n+1);
+end
+Lq = sum(Lqlist);
+lamdahat = sum(q.ArrivalRate * P);
+W = L / lamdahat;
+Wq = Lq / lamdahat;
+
 
 % This sets some paper-related properties of the figure so that you can
 % save it as a PDF and it doesn't fill a whole page.

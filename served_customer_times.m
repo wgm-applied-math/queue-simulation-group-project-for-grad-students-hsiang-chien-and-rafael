@@ -12,11 +12,12 @@ arguments
 end
 
 num_customers_served = size(q.Served, 2);
-times = zeros([1, num_customers_served]);
+times = zeros([num_customers_served, 1]);
 
 for j = 1:num_customers_served
     customer = q.Served{j};
-    times(j) = customer.DepartureTime - customer.ArrivalTime;
+    times(j) = customer.DepartureTime - customer.BeginServiceTime ;
+    %  - customer.ArrivalTime
 end
 
 end
