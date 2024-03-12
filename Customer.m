@@ -25,8 +25,6 @@ classdef Customer < handle
         % handle_departure method.
         DepartureTime;
         
-        % RenegeTime
-        RenegeTime;
     end
 
     methods
@@ -40,12 +38,11 @@ classdef Customer < handle
                 ArrivalTime = Inf;
                 BeginServiceTime = Inf;
                 DepartureTime = Inf;
-            
             end
             obj.Id = Id;
             obj.ArrivalTime = ArrivalTime;
             obj.BeginServiceTime = BeginServiceTime;
-            obj.DepartureTime = DepartureTime;
+            obj.DepartureTime = DepartureTime; 
         end
     end
 end

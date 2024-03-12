@@ -7,14 +7,13 @@ classdef ServiceQueue < handle
         % ArrivalRate - Customers arrive according to a Poisson process.
         % The inter-arrival time is exponentially distributed with a rate
         % parameter of ArrivalRate.
-        ArrivalRate = 1/30; % minutes
+        ArrivalRate = 1/30;
 
         % DepartureRate - When a customer arrives, the time it takes for
         % them to be served is exponentially distributed with a rate
         % parameter of DepartureRate.
-        DepartureRate = 1/20; % minutes
-        RenegingRate = 1/15; % minutes
-
+        DepartureRate = 1/20;
+        RenegingRate = 1/15;
         % NumServers - How many identical serving stations are available.
         NumServers = 1;
 
@@ -22,7 +21,7 @@ classdef ServiceQueue < handle
         % entries.  Log events are scheduled so that when one log entry is
         % recorded, the next is scheduled for the curren time plus this
         % interval.
-        LogInterval = 1;
+        LogInterval = 10;
     
     end
 
@@ -39,6 +38,8 @@ classdef ServiceQueue < handle
         % station begins serving a customer.  The resulting random number
         % is the time until service is complete.
         ServiceDist;
+
+        RenegeDist;
 
         % ServerAvailable - Row vector of boolean values, initial all true.
         % ServerAvailable(j) is set to false when serving station j begins
@@ -62,21 +63,23 @@ classdef ServiceQueue < handle
         % vector.  When a serving station is available, the first Customer
         % is removed from Waiting and moved to the corresponding slot in
         % Servers.
-        Waiting;
+        Waiting = {};
 
         % Served - Cell array row vector of Customer objects. Initially
         % empty.  When a Customer's service is complete, the Customer
         % object is moved from its slot in Servers to the end of Served.
-        Served;
-        
-        % Renege
-        Renege
-
-        % Log - Table of log entries. Its columns are 'Time', 'NWaiting',
-        % 'NInService', 'NServed', meaning: time, how many customers are
-        % currently waiting, how many are currently being served, and how
-        % many have been served.
-        Log;
+        Served = {};
+        Renege= {};
+        % Log - Table of log entries. Its columns are:
+        % * Time - Time of the log entry
+        % * NumWaiting - How many customers are currently waiting
+        % * NumInService - How many are currently being served
+        % * NumServed -  How many have been served
+        Log = table(Size=[0, 5], ...
+            VariableNames=...
+            {'Time', 'NWaiting', 'NInService', 'NServed','NRenege'}, ...
+            VariableTypes=...
+            {'double', 'int64', 'int64', 'int64','int64'});
     
     end
 
@@ -112,22 +115,13 @@ classdef ServiceQueue < handle
                 makedist("Exponential", mu=1/obj.ArrivalRate);
             obj.ServiceDist = ...
                 makedist("Exponential", mu=1/obj.DepartureRate);
-            obj.Renege = ...
-                makedist("Exponential", mu=1/obj.RenegingRate);
-            obj.ServerAvailable = repelem(true, obj.NumServers);
+            obj.RenegeDist = makedist("Exponential", mu=1/obj.RenegingRate);
+            obj.ServerAvailable = repelem(true, obj.NumServers);            
             obj.Servers = cell([1, obj.NumServers]);
+            % Events has to be initialized in the constructor.
             obj.Events = PriorityQueue({}, @(x) x.Time);
-            obj.Waiting = {};
-            obj.Served = {};
-            obj.Log = table( ...
-                Size=[0, 5], ...
-                VariableNames=...
-                    {'Time', 'NWaiting', 'NInService', 'NServed','NRenege'}, ...
-                VariableTypes=...
-                    {'double', 'int64', 'int64', 'int64','int64'});
 
-            % The first event is to record the state at time 0 to the log.
-            schedule_event(obj, RecordToLog(0));
+            schedule_event(obj, RecordToLog(obj.LogInterval));
         end
 
         function obj = run_until(obj, MaxTime)
@@ -136,7 +130,7 @@ classdef ServiceQueue < handle
             % obj = run_until(obj, MaxTime) Repeatedly handle the next
             % event until the current time is at least MaxTime.
 
-            while obj.Time < MaxTime
+            while obj.Time <= MaxTime
                 handle_next_event(obj)
             end
         end
@@ -144,9 +138,8 @@ classdef ServiceQueue < handle
         function schedule_event(obj, event)
             % schedule_event Add an object to the event queue.
 
-            if event.Time < obj.Time
-                error('event happens in the past');
-            end
+            assert(event.Time >= obj.Time, ...
+                "Event happens in the past");
             push(obj.Events, event);
         end
 
@@ -154,13 +147,11 @@ classdef ServiceQueue < handle
             % handle_next_event Pop the next event and use the visitor
             % mechanism on it to do something interesting.
 
-            if is_empty(obj.Events)
-                error('no unhandled events');
-            end
+            assert(~is_empty(obj.Events), ...
+                "No unhandled events");
             event = pop_first(obj.Events);
-            if obj.Time > event.Time
-                error('event happened in the past');
-            end
+            assert(event.Time >= obj.Time, ...
+                "Event happens in the past");
 
             % Update the current time to match the event that just
             % happened.
@@ -198,7 +189,7 @@ classdef ServiceQueue < handle
             % It will arrive after a random time sampled from
             % obj.InterArrivalDist.
             inter_arrival_time = random(obj.InterArrivalDist);
-
+           
             % Build an Arrival instance that says that the next customer
             % arrives at the randomly determined time.
             next_arrival = ...
@@ -208,15 +199,17 @@ classdef ServiceQueue < handle
             % Check to see if any customers can advance.
             advance(obj);
         end
-        
-        
-            
 
         function handle_departure(obj, departure)
             % handle_departure Handle a departure event.
 
             % This is which service station experiences the departure.
             j = departure.ServerIndex;
+
+            assert(~obj.ServerAvailable(j), ...
+                "Service station j must be occupied");
+            assert(obj.Servers{j} ~= false, ...
+                "There must be a customer in service station j");
             customer = obj.Servers{j};
 
             % Record the event time as the departure time for this
@@ -233,7 +226,7 @@ classdef ServiceQueue < handle
             % Check to see if any customers can advance.
             advance(obj);
         end
-        
+
         function begin_serving(obj, j, customer)
             % begin_serving Begin serving the given customer at station j.
             % This is a helper method for advance(). It's a separate method
@@ -273,10 +266,15 @@ classdef ServiceQueue < handle
                 % one serving station is available.
                 if x
                     % Move the customer from Waiting list
-                    customer = obj.Waiting{1};
+                    customer = obj.Waiting{1};     
+                    threshold = random(obj.RenegeDist);
                     obj.Waiting(1) = [];
+                    if obj.Time - customer.ArrivalTime > threshold
+                        obj.Renege{end+1} = customer;
                     % and begin serving them at station j.
-                    begin_serving(obj, j, customer);
+                    else
+                        begin_serving(obj, j, customer);
+                    end
                 else
                     % No station is available, so no more customers can
                     % advance.  Break out of the loop.
@@ -302,6 +300,16 @@ classdef ServiceQueue < handle
             schedule_event(obj, RecordToLog(obj.Time + obj.LogInterval));
         end
 
+        function n = count_customers_in_system(obj)
+            % count_customers_in_system Return how many customers are
+            % currently in the system, including those waiting and those
+            % being served.
+
+            NumWaiting = length(obj.Waiting);
+            NumInService = obj.NumServers - sum(obj.ServerAvailable);
+            n = NumWaiting + NumInService;
+        end
+
         function record_log(obj)
             % record_log Record a summary of the service queue state.
 
@@ -309,7 +317,6 @@ classdef ServiceQueue < handle
             NInService = obj.NumServers - sum(obj.ServerAvailable);
             NServed = length(obj.Served);
             NRenege = length(obj.Renege);
-
             % MATLAB-ism: This is how to add a row to the end of a table.
             obj.Log(end+1, :) = {obj.Time, NWaiting, NInService, NServed, NRenege};
         end
