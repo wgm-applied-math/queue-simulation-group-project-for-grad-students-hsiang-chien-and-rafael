@@ -269,12 +269,12 @@ classdef ServiceQueue < handle
                     customer = obj.Waiting{1};     
                     threshold = random(obj.RenegeDist);
                     obj.Waiting(1) = [];
-                    if obj.Time - customer.ArrivalTime > threshold
-                        obj.Renege{end+1} = customer;
+                    %if obj.Time - customer.ArrivalTime > threshold
+                        %obj.Renege{end+1} = customer;
                     % and begin serving them at station j.
-                    else
-                        begin_serving(obj, j, customer);
-                    end
+                    % else
+                    begin_serving(obj, j, customer);
+                    %end
                 else
                     % No station is available, so no more customers can
                     % advance.  Break out of the loop.
