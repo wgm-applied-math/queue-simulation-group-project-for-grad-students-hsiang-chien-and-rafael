@@ -261,20 +261,20 @@ classdef ServiceQueue < handle
                 % first index j such that ServerAvailable{j} is true (==
                 % 1), by calling the max() function like this.)
                 [x, j] = max(obj.ServerAvailable);
-               
+
                 % If x = the max of ServerAvailable is true, then at least
                 % one serving station is available.
                 if x
                     % Move the customer from Waiting list
                     customer = obj.Waiting{1};     
-                    threshold = random(obj.RenegeDist);
                     obj.Waiting(1) = [];
-                    %if obj.Time - customer.ArrivalTime > threshold
-                        %obj.Renege{end+1} = customer;
-                    % and begin serving them at station j.
-                    % else
+                    threshold = random(obj.RenegeDist);
+                    if obj.Time - customer.ArrivalTime > threshold 
+                        obj.Renege{end+1} = customer;
+                     % and begin serving them at station j.
+                    else
                     begin_serving(obj, j, customer);
-                    %end
+                    end 
                 else
                     % No station is available, so no more customers can
                     % advance.  Break out of the loop.
