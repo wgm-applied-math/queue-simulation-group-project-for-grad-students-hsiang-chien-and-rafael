@@ -249,7 +249,14 @@ classdef ServiceQueue < handle
             % the customer at station j departs.
             obj.schedule_event(Departure(obj.Time + service_time, j));
         end
-
+        
+        function correct_log_for_renege(obj, a, b)
+        % correct_log_for_renege Subtract one from the NWaiting field
+        % of every log entry whose time is between a and b.
+            ToCorrect = obj.Log.Time >= a & obj.Log.Time <= b;
+            obj.Log.NWaiting(ToCorrect) = obj.Log.NWaiting(ToCorrect) - 1;
+        end
+           
         function advance(obj)
             % advance Check to see if a waiting customer can advance.
 
@@ -261,7 +268,7 @@ classdef ServiceQueue < handle
                 % first index j such that ServerAvailable{j} is true (==
                 % 1), by calling the max() function like this.)
                 [x, j] = max(obj.ServerAvailable);
-
+                
                 % If x = the max of ServerAvailable is true, then at least
                 % one serving station is available.
                 if x
@@ -271,8 +278,11 @@ classdef ServiceQueue < handle
                     threshold = random(obj.RenegeDist);
                     if obj.Time - customer.ArrivalTime > threshold 
                         obj.Renege{end+1} = customer;
-                     % and begin serving them at station j.
+                        a = customer.ArrivalTime + threshold;
+                        b = obj.Time;
+                        correct_log_for_renege(obj, a, b);
                     else
+                    % begin serving them at station j.
                     begin_serving(obj, j, customer);
                     end 
                 else

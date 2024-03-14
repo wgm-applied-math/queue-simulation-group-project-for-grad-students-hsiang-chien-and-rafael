@@ -7,7 +7,7 @@
 n_samples = 100;
 
 % Each sample is run up to a maximum time of 480 (8 hours).
-max_time = 10000;
+max_time = 480;
 
 % Record how many customers are in the system at the end of each sample.
 NInSystemSamples = cell([1, n_samples]);
@@ -19,7 +19,7 @@ NInSystemSamples = cell([1, n_samples]);
 % the log interval should be long enough for several arrival and departure
 % events happen.
 for sample_num = 1:n_samples
-    q = ServiceQueue(LogInterval=500,NumServers=1);
+    q = ServiceQueue(LogInterval=10,NumServers=2);
     q.schedule_event(Arrival(1, Customer(1)));
     run_until(q, max_time);
     % Pull out samples of the number of customers in the queue system. Each
@@ -28,6 +28,7 @@ for sample_num = 1:n_samples
     % columns like this.
     NInSystemSamples{sample_num} = q.Log.NWaiting + q.Log.NInService;
     TotalTimeSamples{sample_num} = served_customer_times(q);
+    NRenegeSamples{sample_num} = q.Log.NRenege(end);
 end
 
 % Join all the samples. "vertcat" is short for "vertical concatenate",
@@ -35,6 +36,7 @@ end
 % in one tall column.
 NInSystem = vertcat(NInSystemSamples{:});
 TotalTime = vertcat(TotalTimeSamples{:});
+NRenege = vertcat(NRenegeSamples{:});
 % MATLAB-ism: When you pull multiple items from a cell array, the result is
 % a "comma-separated list" rather than some kind of array.  Thus, the above
 % means
@@ -52,7 +54,8 @@ TotalTime = vertcat(TotalTimeSamples{:});
 % Start with a histogram.  The result is an empirical PDF, that is, the
 % area of the bar at horizontal index n is proportional to the fraction of
 % samples for which there were n customers in the system.
-%h2 = histogram(TotalTime, Normalization="probability");
+%h3 = histogram(NRenege, Normalization="probability",BinMethod="integers");
+h2 = histogram(TotalTime, Normalization="probability");
 h1 = histogram(NInSystem, Normalization="probability", BinMethod="integers");
 
 % MATLAB-ism: Once you've created a picture, you can use "hold on" to cause
